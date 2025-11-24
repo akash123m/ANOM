@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANOM | Encrypted connection...</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-green: #0f0;
+            --dark-bg: #050505;
+            --dim-green: #003300;
+        }
+        
+        body {
+            background-color: var(--dark-bg);
+            color: var(--neon-green);
+            font-family: 'VT323', monospace;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* CRT Scanline Effect */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.2) 50%,
+                rgba(0,0,0,0.2)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .glow {
+            text-shadow: 0 0 5px var(--neon-green), 0 0 10px var(--neon-green);
+        }
+
+        .terminal-input {
+            background: transparent;
+            border: none;
+            color: var(--neon-green);
+            font-family: 'VT323', monospace;
+            outline: none;
+            width: 100%;
+        }
+
+        .btn-hacker {
+            border: 1px solid var(--neon-green);
+            background: rgba(0, 255, 0, 0.1);
+            transition: all 0.2s;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+        .btn-hacker:hover {
+            background: var(--neon-green);
+            color: var(--dark-bg);
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Flicker Animation */
+        @keyframes flicker {
+            0% { opacity: 0.9; }
+            5% { opacity: 0.8; }
+            10% { opacity: 0.9; }
+            15% { opacity: 0.1; }
+            20% { opacity: 0.9; }
+            100% { opacity: 0.9; }
+        }
+        .flicker {
+            animation: flicker 4s infinite;
+        }
+
+        .message-appear {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Vignette */
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.8) 100%);
+            pointer-events: none;
+            z-index: 40;
+        }
+
+        /* Typing Effect */
+        .typing-effect {
+            overflow: hidden;
+            white-space: nowrap;
+            border-right: 2px solid var(--neon-green);
+            width: 0;
+            animation: typing 3.5s steps(40, end) forwards, blink-caret 0.75s step-end infinite;
+        }
+
+        @keyframes typing {
+            from { width: 0 }
+            to { width: 100% }
+        }
+        @keyframes blink-caret {
+            from, to { border-color: transparent }
+            50% { border-color: var(--neon-green); }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center relative selection:bg-green-900 selection:text-white">
+
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+
+    <!-- Main Container -->
+    <div id="app" class="w-full max-w-3xl h-[90vh] border border-green-800 bg-black bg-opacity-90 relative z-10 flex flex-col shadow-[0_0_20px_rgba(0,255,0,0.2)]">
+        
+        <!-- Header -->
+        <header class="border-b border-green-800 p-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <span class="animate-pulse">●</span>
+                <h1 class="text-3xl tracking-widest glow font-bold">ANOM</h1>
+            </div>
+            <div id="connection-status" class="text-xs opacity-70">STATUS: ENCRYPTED</div>
+        </header>
+
+        <!-- View: Landing -->
+        <div id="view-landing" class="flex-1 flex flex-col items-center justify-center gap-8 p-8">
+            <div class="text-center max-w-md">
+                <p class="text-xl mb-2 typing-effect">WELCOME TO THE NETWORK.</p>
+                <p class="text-sm opacity-70">NO LOGS. NO TRACES. PURE ANONYMITY.</p>
+            </div>
+
+            <div class="flex flex-col w-full max-w-xs gap-4">
+                <button id="btn-create" class="btn-hacker py-3 text-xl">
+                    > INITIALIZE NEW NODE
+                </button>
+                
+                <div class="relative group">
+                    <div class="flex border border-green-800 p-1 focus-within:border-green-500 transition-colors">
+                        <span class="px-2 select-none">></span>
+                        <input type="text" id="input-join-code" class="terminal-input text-lg uppercase" placeholder="ENTER ACCESS CODE..." maxlength="6">
+                        <button id="btn-join" class="px-3 hover:bg-green-900 text-green-500 font-bold">JOIN</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="landing-error" class="text-red-500 hidden text-sm"></div>
+        </div>
+
+        <!-- View: Room -->
+        <div id="view-room" class="hidden flex-1 flex flex-col h-full overflow-hidden">
+            <!-- Room Info Bar -->
+            <div class="bg-green-900/20 p-2 text-sm flex justify-between items-center border-b border-green-800/50">
+                <div>ACCESS CODE: <span id="display-room-code" class="font-bold glow select-all cursor-copy" title="Click to copy">---</span></div>
+                <button id="btn-leave" class="hover:text-red-500 hover:underline">[DISCONNECT]</button>
+            </div>
+
+            <!-- Chat Log -->
+            <div id="chat-log" class="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide font-mono text-lg">
+                <!-- Messages go here -->
+                <div class="text-green-800 italic text-sm text-center my-4">--- SECURE CHANNEL ESTABLISHED ---</div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-4 border-t border-green-800 bg-black">
+                <div class="flex items-center gap-2">
+                    <span class="text-green-500 animate-pulse">></span>
+                    <input type="text" id="message-input" class="terminal-input text-xl" placeholder="Transmit data..." autocomplete="off">
+                    <button id="btn-send" class="btn-hacker px-4 py-1 text-sm">SEND</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="absolute bottom-4 text-green-900 text-xs z-0">
+        v1.0.4 // ANOM_SYSTEMS
+    </div>
+
+    <script type="module">
+        // Import Trystero for P2P networking
+        import { joinRoom as trysteroJoinRoom, selfId } from 'https://cdn.jsdelivr.net/npm/trystero@0.16.0/+esm';
+
+        // State
+        const state = {
+            currentRoom: null,
+            username: 'ANON_' + Math.floor(Math.random() * 1000),
+            roomInstance: null,
+            sendAction: null,
+            messages: [],
+            peers: {}
+        };
+
+        // DOM Elements
+        const views = {
+            landing: document.getElementById('view-landing'),
+            room: document.getElementById('view-room')
+        };
+        const inputs = {
+            joinCode: document.getElementById('input-join-code'),
+            message: document.getElementById('message-input')
+        };
+        const buttons = {
+            create: document.getElementById('btn-create'),
+            join: document.getElementById('btn-join'),
+            leave: document.getElementById('btn-leave'),
+            send: document.getElementById('btn-send')
+        };
+        const displays = {
+            roomCode: document.getElementById('display-room-code'),
+            chatLog: document.getElementById('chat-log'),
+            error: document.getElementById('landing-error')
+        };
+
+        // Utilities
+        const generateCode = () => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 6; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        };
+
+        const showView = (viewName) => {
+            if (viewName === 'landing') {
+                views.landing.classList.remove('hidden');
+                views.room.classList.add('hidden');
+            } else {
+                views.landing.classList.add('hidden');
+                views.room.classList.remove('hidden');
+            }
+        };
+
+        // Decrypt Effect for Room Code
+        const decryptEffect = (element, finalText, speed = 50) => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+            let iterations = 0;
+            
+            const interval = setInterval(() => {
+                element.innerText = finalText
+                    .split('')
+                    .map((letter, index) => {
+                        if (index < iterations) {
+                            return finalText[index];
+                        }
+                        return chars[Math.floor(Math.random() * chars.length)];
+                    })
+                    .join('');
+                
+                if (iterations >= finalText.length) { 
+                    clearInterval(interval);
+                }
+                
+                iterations += 1/3; // Control speed
+            }, speed);
+        };
+
+        const addMessageToLog = (msgObj) => {
+            state.messages.push(msgObj);
+            
+            const div = document.createElement('div');
+            div.className = `message-appear break-words ${msgObj.system ? 'text-center opacity-50 text-sm' : 'mb-2'}`;
+            
+            if (msgObj.system) {
+                div.innerText = `[SYSTEM]: ${msgObj.text}`;
+            } else {
+                const time = new Date(msgObj.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const isMe = msgObj.sender === state.username;
+                const senderColor = isMe ? 'text-green-300' : 'text-green-600';
+                const senderName = isMe ? 'YOU' : msgObj.sender;
+                
+                div.innerHTML = `
+                    <div class="flex items-baseline gap-2">
+                        <span class="text-[10px] opacity-40 font-mono whitespace-nowrap">[${time}]</span> 
+                        <span class="${senderColor} font-bold whitespace-nowrap">&lt;${senderName}&gt;</span> 
+                        <span class="${isMe ? 'text-white' : 'text-green-400'}">${escapeHtml(msgObj.text)}</span>
+                    </div>
+                `;
+            }
+            displays.chatLog.appendChild(div);
+            displays.chatLog.scrollTop = displays.chatLog.scrollHeight;
+        };
+
+        const escapeHtml = (unsafe) => {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        // Actions
+        const joinRoom = (code) => {
+            if (!code || code.length < 4) {
+                displays.error.innerText = "ERROR: INVALID CODE LENGTH";
+                displays.error.classList.remove('hidden');
+                return;
+            }
+            
+            const roomCode = code.toUpperCase();
+            state.currentRoom = roomCode;
+            displays.error.classList.add('hidden');
+            
+            // Initialize Trystero Room
+            // App ID ensures we only talk to other ANOM users
+            const config = { appId: 'anom_secure_net_v1' };
+            const room = trysteroJoinRoom(config, roomCode);
+            state.roomInstance = room;
+            
+            // Update Status
+            const statusEl = document.getElementById('connection-status');
+            if(statusEl) statusEl.innerText = "STATUS: ESTABLISHING UPLINK...";
+
+            // Setup Actions
+            const [sendMsg, getMsg] = room.makeAction('chat');
+            state.sendAction = sendMsg;
+
+            // Handle Incoming Messages
+            getMsg((data, peerId) => {
+                addMessageToLog(data);
+            });
+
+            // Handle Peers
+            room.onPeerJoin(peerId => {
+                addMessageToLog({
+                    text: `NODE ${peerId.substr(0, 4)} CONNECTED`,
+                    sender: 'SYSTEM',
+                    system: true,
+                    timestamp: Date.now()
+                });
+                updatePeerCount(Object.keys(state.roomInstance.getPeers()).length + 1); // +1 for self
+            });
+
+            room.onPeerLeave(peerId => {
+                addMessageToLog({
+                    text: `NODE ${peerId.substr(0, 4)} DISCONNECTED`,
+                    sender: 'SYSTEM',
+                    system: true,
+                    timestamp: Date.now()
+                });
+                updatePeerCount(Object.keys(state.roomInstance.getPeers()).length + 1); // Peers + self
+            });
+
+            showView('room');
+            displays.chatLog.innerHTML = '<div class="text-green-800 italic text-sm text-center my-4">--- SECURE CHANNEL ESTABLISHED (P2P) ---</div>';
+            
+            // Initial System Message
+            addMessageToLog({
+                text: `CONNECTED AS ${state.username}`,
+                sender: 'SYSTEM',
+                system: true,
+                timestamp: Date.now()
+            });
+            
+            // Trigger decrypt effect
+            decryptEffect(displays.roomCode, state.currentRoom);
+            
+            inputs.message.focus();
+            updatePeerCount(1); // Start with 1 (self)
+        };
+
+        const leaveRoom = () => {
+            if (state.roomInstance) {
+                state.roomInstance.leave();
+                state.roomInstance = null;
+            }
+            state.currentRoom = null;
+            state.messages = [];
+            showView('landing');
+            inputs.joinCode.value = '';
+        };
+
+        const sendMessage = () => {
+            const text = inputs.message.value.trim();
+            if (!text || !state.roomInstance) return;
+
+            const msgObj = {
+                text: text,
+                sender: state.username,
+                system: false,
+                timestamp: Date.now()
+            };
+
+            // Send to peers
+            if (state.sendAction) {
+                state.sendAction(msgObj);
+            }
+
+            // Show locally
+            addMessageToLog(msgObj);
+
+            inputs.message.value = '';
+        };
+        
+        const updatePeerCount = (count) => {
+            const statusEl = document.getElementById('connection-status');
+            if(statusEl) statusEl.innerText = `STATUS: ENCRYPTED [${count} NODES]`;
+        }
+
+        // Event Listeners
+        buttons.create.addEventListener('click', () => {
+            const newCode = generateCode();
+            joinRoom(newCode);
+        });
+
+        buttons.join.addEventListener('click', () => {
+            joinRoom(inputs.joinCode.value);
+        });
+
+        buttons.leave.addEventListener('click', leaveRoom);
+
+        buttons.send.addEventListener('click', sendMessage);
+
+        inputs.message.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+        
+        inputs.joinCode.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') joinRoom(inputs.joinCode.value);
+        });
+
+        displays.roomCode.addEventListener('click', () => {
+            navigator.clipboard.writeText(state.currentRoom);
+            const originalText = displays.roomCode.innerText;
+            displays.roomCode.innerText = "COPIED!";
+            setTimeout(() => {
+                if(state.currentRoom) displays.roomCode.innerText = state.currentRoom;
+            }, 1000);
+        });
+        
+        if (inputs.joinCode) inputs.joinCode.value = '';
+    </script>
+</body>
+</html>
